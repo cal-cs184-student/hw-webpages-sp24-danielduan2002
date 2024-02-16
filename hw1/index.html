@@ -1,7 +1,219 @@
-<html>
-	<head>
-	</head>
-	<body>
-		Homework 1 index.html here
-	</body>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<style>
+  body {
+    padding: 100px;
+    width: 1000px;
+    margin: auto;
+    text-align: left;
+    font-weight: 300;
+    font-family: 'Open Sans', sans-serif;
+    color: #121212;
+  }
+  h1, h2, h3, h4 {
+    font-family: 'Source Sans Pro', sans-serif;
+  }
+</style>
+<title>CS 184/284A Rasterizer</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<link href="https://fonts.googleapis.com/css?family=Open+Sans|Source+Sans+Pro" rel="stylesheet">
+</head>
+
+
+<body>
+
+<h1 align="middle">CS184</h1>
+<h1 align="middle">Project 1: Rasterizer</h1>
+<h2 align="middle">Daniel Duan</h2>
+
+<br><br>
+
+<div>
+<h2 align="middle">Overview</h2>
+<p>In this project, I implemented a rasterizer, a program 
+	that takes abstract representations of shapes and objects, and renders 
+	them into an image using points, lines, and triangles as the underlying 
+	primitives. This project explored many interesting concepts like supersampling, barycentric coordinate interpolation, 
+	and texture mapping. Supersampling enabled the antialiasing of a rendered image, 
+	smoothing out jagged edges and corners. Barycentric coordinate interpolation 
+	allowed for smooth color gradients. Texture mapping techniques allowed for textures to
+	be applied to a scene. 
+	<br><br>
+	This project was a big undertaking in conceptual understanding and programmatic effort. 
+	I learned a lot about computer graphics fundamentals, and developing in C++ changed my opinion
+	of the C programming language (I hated it in CS162). I felt like I spent a whole lifetime debugging, 
+	but I learned the most when things were going wrong.
+</p>
+
+<h2 align="middle">Section I: Rasterization</h2>
+
+<h3 align="middle">Task 1: Drawing Single-Color Triangles</h3>
+<p> At a high level, the triangle rasterization procedure takes in coordinates to 
+	a triangle's three corners as well as the desired rgb color of the triangle, 
+	identifies the pixels on the screen that lie inside the triangle, and sets those pixels to the desired color. 
+	My implementation of triangle rasterization consisted of these steps: 
+	<br><br>
+	1. Compute the bounding box that encloses the triangle. A naive approach would check every single (x,y) pixel in screen space. We can do 
+	better by using this fact: any pixel that lies outside of a triangle's bounding box also 
+	lies outside the triangle.
+	<br>
+	2. Iterate over each pixel inside the bounding box, perform three line tests to determine 
+	if the pixel lies inside or outside of the triangle. Fill the pixel with the color if it lies
+	inside the triangle. 
+	<br><br>
+	An example output of the triangle rasterization procedure is shown below. Aliasing is visible
+	at the corners of some of the triangles, suggesting the procedure has room for improvement. 
+</p>
+<div align="middle">
+	<img src="images/task1.png" align="middle" width="600px"/>
+</div>
+
+
+<h3 align="middle">Task 2: Antialiasing by Supersampling</h3>
+<p> To tackle the issue of aliasing from Task 1, we leverage an approach called 
+	supersampling. Supersampling subdivides each pixel for more precise subsamples, and
+	results in a rasterization with high-frequency content filtered out. For the task 1 triangles, 
+	supersampling will have the visual effect of "smoothing" out the jaggies in the triangles' edges and corners.
+	<br><br>
+	In the codebase, supersampling involved dynamically resizing the sample_buffer data structure 
+	by the given supersampling rate. The triangle rasterization algorithm from Task 1
+	was then modified to perform the inside triangle test for each subsample coordinate
+	of every pixel. At the end of the pipeline, the rasterized sample_buffer data is resolved
+	to the screen's framebuffer. With supersampling, resolving a pixel's final color involves
+	computing the average color of each of it's subsamples from the sample_buffer.
+	<br><br>
+	Supersampling requires data structures with more memory, as well as modifications
+	to the rasterization algorithm that result in a larger time complexity. The final product, however,
+	is worth the cost. Antialiased triangles!!
+</p>
+<img src="images/task2rate1.png" align="middle" width="300px"/>
+<img src="images/task2rate4.png" align="middle" width="300px"/>
+<img src="images/task2rate16.png" align="middle" width="300px"/>
+</div>
+
+<br><br>
+<h2 align="middle">Section II: Sampling</h2>
+
+<h3 align="middle">Task 3: Transforms</h3>
+<p align="middle"> 
+	This task added support for translation, scaling, and rotation operations on coordinate vectors.
+	<br><br>
+	I like spaghetti, so I added rotations to the svg to give the robot wavy spaghetti noodle arms and legs.
+</p>
+<div align="middle">
+<img src="images/task3spaghettiman.png" align="middle" width="300px"/>
+</div>
+
+<h3 align="middle">Task 4: Barycentric Coordinates</h3>
+<p> Barycentric coordinates are a coordinate system defined through 
+	three values (alpha, beta, gamma) derived from a reference triangle. Given some vertex data for a 
+	triangle, barycentric coordinates are useful for interpolating that data 
+	across the triangle's surface. Using the triangle example below, a coordinate that is 
+	closer to the red vertex would have a greater weight assigned to the color red. 
+	Doing this for many triangles can create images like the circle on the right, with 
+	a smooth gradient of many colors going around the circle.
+</p>
+
+<div align="middle">
+	<img src="images/task4barytriangle.png" align="middle" width="300px"/>
+	<img src="images/task4barycircle.png" align="middle" width="500px"/>
+<div>
+
+<h3 align="middle">Part 5: "Pixel Sampling" for Texture Mapping</h3>
+<p> Pixel sampling involves the task of identifying which pixel from a 
+	texture should be sampled for a given pixel in screen space. 
+	The map between the texturespace and the screenspace may be highly non-linear. 
+	Different pixel sampling methods like nearest-neighbor and bilinear offer different 
+	approaches picking a texture. 
+
+  Nearest-neighbor pixel sampling simply identifies the nearest texel. 
+  Bilinear sampling, in contrast, finds the four closest texels in the texture map
+   and performs linear interpolations across the horizontal and vertical axes to  
+  produce a color value that is averaged across the coordinate's surroundings.
+  <br><br>
+  <b>Figure 5a and b</b> illustrate differences between the two pixel sampling approaches. 
+  Bilinear sampling produces a higher quality render of Sather Tower than nearest-neighbor sampling, 
+  evident by the more natural shadows and edges produced by the bilinear sampling. 
+  <br><br>
+  In both sampling methods, supersampling improves the quality. 
+  The largest differences between bilinear and nearest-neighbor are found at sample
+   points where the area of the 
+  screen space is bigger relative to the texture space. Under nearest-neighbor, this 
+  results in one texel being applied to many screen samples. Bilinear sampling does better 
+  in this instance.
+</p> 
+
+<img src="images/task5nearest.png" align="middle" width="300px"/>
+<figcaption align="middle"><b>Figure 5a:<b> Nearest-Neighbor.</figcaption>
+<img src="images/task5bilinear.png" align="middle" width="300px"/>
+<figcaption align="middle"><b>Figure 5a:<b> Bilinear.</figcaption>
+
+<div align="middle">
+  <table style="width:100%">
+    <tr>
+      <td>
+        <img src="images/task5nearest1.png" align="middle" width="400px"/>
+        <figcaption align="middle"><b>Figure 5c:<b> Nearest-Neighbor (sample rate = 1).</figcaption>
+      </td>
+      <td>
+        <img src="images/task5bilinear1.png" align="middle" width="400px"/>
+        <figcaption align="middle"><b>Figure 5d:<b> Bilinear (sample rate = 1).</figcaption>
+      </td>
+    </tr>
+    <td>
+      <img src="images/task5nearest16.png" align="middle" width="400px"/>
+      <figcaption align="middle"><b>Figure 5e:<b> Nearest-Neighbor (sample rate = 16).</figcaption>
+    </td>
+    <td>
+      <img src="images/task5bilinear16.png" align="middle" width="400px"/>
+      <figcaption align="middle"><b>Figure 5f:<b>  Bilinear (sample rate = 16).</figcaption>
+    </td>
+  </tr>
+  </table>
+</div>
+
+
+<h3 align="middle">Part 6: "Level sampling" with mipmaps for texture mapping</h3>
+<p> Level sampling and mipmaps help to address issues related to minification. 
+	Minification refers to the case where a single pixel in screen space spans multiple 
+	texels in texture space. 
+	To address this, we use a process called level sampling, which uses collections of downsampled 
+  textures, called mipmaps. We retrieve texel values from 
+  the appropriate mipmap level (based on degree of minification at the local area) for a given pixel in screen space. 
+  <br><br>
+  Mipmaps are worth the implementation cost because they only need 
+  an additional 1/3 amount of memory. The figures below show that nearest neighbor sampling 
+  and bilinear sampling both demonstrate improvements to quality when paired with 
+  level sampling.
+</p>
+
+<div align="middle">
+  <table style="width:100%">
+    <tr>
+      <td>
+        <img src="images/task6level0nearest.png" align="middle" width="400px"/>
+        <figcaption align="middle"><b>Figure 6a:<b> LSM = Level 0, PSM = Nearest.</figcaption>
+      </td>
+      <td>
+        <img src="images/task6nearestbilinear.png" align="middle" width="400px"/>
+        <figcaption align="middle"><b>Figure 6b:<b> LSM = Level 0, PSM = Bilinear.</figcaption>
+      </td>
+    </tr>
+    <br>
+    <tr>
+      <td>
+        <img src="images/task6nearestnearest.png" align="middle" width="400px"/>
+        <figcaption align="middle"><b>Figure 6c:<b> LSM = Nearest, PSM = Nearest.</figcaption>
+      </td>
+      <td>
+        <img src="images/task6nearestbilinear.png" align="middle" width="400px"/>
+        <figcaption align="middle"><b>Figure 6d:<b> LSM = Nearest, PSM = Bilinear.</figcaption>
+      </td>
+    </tr>
+  </table>
+</div>
+
+
+</body>
 </html>
