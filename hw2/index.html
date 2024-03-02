@@ -1,7 +1,347 @@
-<html>
-	<head>
-	</head>
-	<body>
-		Homework 2 index.html here
-	</body>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<style>
+  body {
+    background-color: white;
+    padding: 100px;
+    width: 1000px;
+    margin: auto;
+    text-align: left;
+    font-weight: 300;
+    font-family: 'Open Sans', sans-serif;
+    color: #121212;
+  }
+  h1, h2, h3, h4 {
+    font-family: 'Source Sans Pro', sans-serif;
+  }
+  kbd {
+    color: #121212;
+  }
+</style>
+<title>CS 184 Mesh Edit</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<link href="https://fonts.googleapis.com/css?family=Open+Sans|Source+Sans+Pro" rel="stylesheet">
+
+<script>
+  MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']]
+    }
+  };
+</script>
+<script id="MathJax-script" async
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js">
+</script>
+
+</head>
+
+
+<body>
+
+<h1 align="middle">CS 184: Computer Graphics and Imaging, Spring 2024</h1>
+<h1 align="middle">Project 2: Mesh Edit</h1>
+<h2 align="middle">Daniel Duan</h2>
+
+<br><br>
+
+<div>
+
+<h2 align="middle">Overview</h2>
+<p>
+    This writeup explores the design and implementation of various mesh editing techniques,
+    like the De Casteljau Algorithm for Bezier Curves and Surfaces, as well as elementary mesh 
+    operations that make use of the half-edge data structure. 
+</p>
+<br>
+
+
+<h2 align="middle">Section I: Bezier Curves and Surfaces</h2>
+
+<h3 align="middle">Part 1: Bezier Curves with 1D de Casteljau Subdivision</h3>
+
+<p>
+    Given a list of n control points, the De Casteljau Algorithm computes the position 
+    of a point on the Bezier Curve parameterized by a value t (between 0 and 1). The algorithm involves 
+    performing (n-1) recursive levels of linear interpolations between the control points and intermediate points. 
+
+    <br><br>
+    An example of a Bezier Curve along with the intermediate steps of De Casteljau is illustrated below.
+</p>
+<br>
+<!-- Example of including a single figure -->
+<div align="middle">
+  <img src="images/fullcurve.png" align="middle" width="50%">
+</div>
+<br>
+
+<b>
+  Steps / levels of the evaluation from the original control points down to the final evaluated point.
+</b>
+<!-- Example of including multiple figures -->
+<div align="middle">
+  <table style="width:100%">
+    <tr align="center">
+      <td>
+        <img src="images/curve1.png" align="middle" width="400px"/>
+        <figcaption>Level 0</figcaption>
+      </td>
+      <td>
+        <img src="images/curve2.png" align="middle" width="400px"/>
+        <figcaption>Level 1</figcaption>
+      </td>
+    </tr>
+    <br>
+    <tr align="center">
+      <td>
+        <img src="images/curve3.png" align="middle" width="400px"/>
+        <figcaption>Level 2</figcaption>
+      </td>
+      <td>
+        <img src="images/curve4.png" align="middle" width="400px"/>
+        <figcaption>Level 3</figcaption>
+      </td>
+    </tr>
+    <br>
+    <tr align="center">
+      <td>
+        <img src="images/curve4.png" align="middle" width="400px"/>
+        <figcaption>Level 4</figcaption>
+      </td>
+      <td>
+        <img src="images/curve5.png" align="middle" width="400px"/>
+        <figcaption>Final evaluated point on the curve.</figcaption>
+      </td>
+    </tr>
+  </table>
+</div>
+<br>
+
+
+<b>
+  A slightly different Bezier curve with moved control points and modified parameter t.
+</b>
+<p>
+  <div align="middle">
+    <img src="images/fullcurve2.png" align="middle" width="50%">
+  </div>
+</p>  
+<br>
+
+
+<h3 align="middle">Part 2: Bezier Surfaces with Separable 1D de Casteljau</h3>
+<p>
+    The De Casteljau algorithm is useful for drawing 2D curves, but also extends naturally to 
+    3D Bezier surfaces. To define a Bezier surface, we simply need several 1D Bezier curves in 3D space.  
+    Evaluating a point on the Bezier surface involves performing the 1D De Casteljau algorithm on each 
+    of the 1D Bezier curves (parameterized by u), and then using the resulting points we perform another evaluation using De Casteljau 
+    (parameterized by v). With Bezier surfaces, we can produce complex geometries, like the teapot below. 
+</p>
+<br>
+
+<p>
+  <div align="middle">
+    <img src="images/teapotsurface.png" align="middle" width="50%">
+  </div>
+</p>
+<br>
+
+
+<h2 align="middle">Section II: Triangle Meshes and Half-Edge Data Structure</h2>
+
+<h3 align="middle">Part 3: Area-Weighted Vertex Normals</h3>
+
+<b>
+  In this section, I implemented area-weighted vertex normals, a useful feature for Phong shading, 
+  which provides smoother shading for surfaces than flat shading. The process involves using the half-edge data structure to iterate through the triangle faces incident to the vertex.
+  For each face, I computed a normal vector using two of its edges, and then weighted the 
+  result by the triangle's area. Lastly, I took the sum of all of these area-weighted normal vectors, 
+  and did a final normalization.
+</b>
+<p>
+  <table style="width:100%">
+    <tr align="center">
+      <td>
+        <img src="images/teapotflat.png" align="middle" width="400px"/>
+        <figcaption>Teapot with Flat Shading</figcaption>
+      </td>
+      <td>
+        <img src="images/teapotphong.png" align="middle" width="400px"/>
+        <figcaption>Teapot with Area-Weight Vertext Normal Shading (Phong)</figcaption>
+      </td>
+    </tr>
+  </table>
+</p>
+<br>
+
+
+<h3 align="middle">Part 4: Edge Flip</h3>
+<b>
+</b>
+<p>
+  To implement the edge flip operation, I referenced this <a href="http://15462.courses.cs.cmu.edu/fall2015content/misc/HalfedgeEdgeOpImplementationGuide.pdf">guide</a> from CMU. 
+  The actual process involved checking that the given edge is not a boundary edge. Then, I used half-edge functions 
+  to list out all relevant mesh elements, and made reassignments to perform the edge flip. I was lucky to not run into 
+  any bugs in this section, but that luck ran out for the next few deliverables.  
+</p>
+<br>
+
+
+<b>
+  The teapot before and after some edge flips.
+</b>
+<p>
+  <table style="width:100%">
+    <tr align="center">
+      <td>
+        <img src="images/teapotpreflip.png" align="middle" width="400px"/>
+        <figcaption>Before flips</figcaption>
+      </td>
+      <td>
+        <img src="images/teapotpostflip.png" align="middle" width="400px"/>
+        <figcaption>After flips</figcaption>
+      </td>
+    </tr>
+  </table>
+</p>
+<br>
+
+
+<h3 align="middle">Part 5: Edge Split</h3>
+<b>
+</b>
+<p>
+  To implement the edge split operation, I used a similar approach that was successful for the flip operation from the previous section. 
+  To do an edge split, I started by enumerating all relevant edges, vertices, and faces. 
+  The operation then involves adding a new vertex, 3 new edges, and 6 new halfedges to the mesh. 
+  Lastly, I also updated the position for the new vertex by computing the midpoint of the given edge.
+</p>
+<br>
+
+
+<b>
+  A mesh before and after some edge splits. 
+</b>
+<p>
+  <table style="width:100%">
+    <tr align="center">
+      <td>
+        <img src="images/cube.png" align="middle" width="400px"/>
+        <figcaption>Cube before edge splits</figcaption>
+      </td>
+      <td>
+        <img src="images/cubepre.png" align="middle" width="400px"/>
+        <figcaption>After edge splits</figcaption>
+      </td>
+    </tr>
+  </table>
+</p>
+<br>
+
+
+<b>
+  A mesh before and after a combination of both edge splits and edge flips.
+</b>
+<p>
+  <table style="width:100%">
+    <tr align="center">
+      <td>
+        <img src="images/cube.png" align="middle" width="400px"/>
+        <figcaption>Cube before edge splits and edge flips</figcaption>
+      </td>
+      <td>
+        <img src="images/cubepost.png" align="middle" width="400px"/>
+        <figcaption>After flips and splits</figcaption>
+      </td>
+    </tr>
+  </table>
+</p>
+
+<p>
+  Debugging this section was a little bit more challenging. I forgot to set the isNew attribute to true for  
+  newly created edges and vertices, and that made part 6 tricky to debug. 
+</p>
+
+
+<h3 align="middle">Part 6: Loop Subdivision for Mesh Upsampling</h3>
+<b>
+  
+</b>
+<p>
+  Loop subdivision consists of several steps:
+  <br>
+  1. Compute new positions for all the vertices in the input mesh, using the Loop subdivision rule.
+  <br>2. Compute the updated vertex positions associated with edges.
+  <br>3. Split every edge in the mesh.
+  <br>4. Flip any new edge that connects an old and new vertex.
+
+  <br>
+  I ran into some tricky infinite loop bugs with this section, but I was able to resolve them 
+  after getting the proper conditions for splitting and edge. 
+</p>
+<br>
+
+<p>
+  <table style="width:100%">
+    <tr align="center">
+      <td>
+        <img src="images/cow1.png" align="middle" width="250px"/>
+      </td>
+      <td>
+        <img src="images/cow2.png" align="middle" width="250px"/>
+      </td>
+      <td>
+        <img src="images/cow3.png" align="middle" width="250px"/>
+      </td>
+    </tr>
+  </table>
+</p>
+
+<b>
+  After loop subdivision, sharp corners and edges tend to get rounded out.
+  This can be seen with the cube mesh, which becomes asymmetric / rounded after repeated subdivisions. 
+</b>
+<p>
+  <table style="width:100%">
+    <tr align="center">
+      <td>
+        <img src="images/cuberound1.png" align="middle" width="250px"/>
+      </td>
+      <td>
+        <img src="images/cuberound2.png" align="middle" width="250px"/>
+      </td>
+      <td>
+        <img src="images/cuberound3.png" align="middle" width="250px"/>
+      </td>
+    </tr>
+  </table>
+</p>
+<br>
+
+
+<b>
+  
+</b>
+<p>
+  By pre-processing the cube with edge splits (up-sampling), we can help to preserve the sharp edges of the mesh 
+  (high frequency 3D content) so that the cube subdivides more symmetrically.
+</p>
+<p>
+  <table style="width:100%">
+    <tr align="center">
+      <td>
+        <img src="images/cubecube1.png" align="middle" width="250px"/>
+      </td>
+      <td>
+        <img src="images/cubecube2.png" align="middle" width="250px"/>
+      </td>
+      <td>
+        <img src="images/cubecube3.png" align="middle" width="250px"/>
+      </td>
+    </tr>
+  </table>
+</p>
+<br>
+
+</body>
 </html>
