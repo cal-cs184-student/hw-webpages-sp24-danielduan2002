@@ -1,7 +1,414 @@
-<html>
-	<head>
-	</head>
-	<body>
-		Homework 4 index.html here
-	</body>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<style>
+  body {
+    padding: 100px;
+    width: 1000px;
+    margin: auto;
+    text-align: left;
+    font-weight: 300;
+    font-family: 'Open Sans', sans-serif;
+    color: #121212;
+  }
+  h1, h2, h3, h4 {
+    font-family: 'Source Sans Pro', sans-serif;
+  }
+</style>
+<title>CS184 ClothSim</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<link href="https://fonts.googleapis.com/css?family=Open+Sans|Source+Sans+Pro" rel="stylesheet">
+</head>
+
+
+<body>
+
+<h1 align="middle">CS 184: Computer Graphics and Imaging, Spring 2024</h1>
+<h1 align="middle">Project 4: Cloth Simulator</h1>
+<h2 align="middle">Daniel Duan</h2>
+
+<br><br>
+
+<div>
+
+<h2 align="middle">Overview</h2>
+<p>In this project, I implemented a real-time cloth material simulator. The cloth material 
+  is modeled as a 2D grid of pointgs masses, as well as springs connecting the masses. 
+  Physical simulation of the cloth involves computing the motion of each point, which is 
+  governed by the cumulative effect of the cloth's many spring forces as well as external forces 
+  like gravity. In the simulator, I also handle collisions between the cloth and other 
+  objects in the scene. In this last section of this project, I wrote several  
+  OpenGL shader programs to take advantage of accelerated, parallel graphics shading. 
+</p>
+
+<h2 align="middle">Part I: Masses and springs</h2>
+<p>
+  The cloth data structure consists of a grid of point masses connected by a lattice of 
+  springs of three types: structural, shearing, and bending. The cloth also has a "pinned" 
+  list of vertices that should not move in the simulation, regardless of the forces applied 
+  on them. Structural and shearing springs apply a resistance force to compressing or 
+  stretching in the plane of the cloth. Bending springs resist changes to the cloth's shape 
+  outside of its plane. Each spring exerts a force (Hooke's Law) on the two points at its two ends.
+  <br><br>
+  <div align="middle">
+    <table style="width:100%">
+      <tr align="center">
+        <td>
+          <img src="images/pinned2.png" align="middle" width="700"/>
+          <figcaption align="center">Cloth wireframe, all spring constraints</figcaption>
+        </td>
+      </tr>
+      <tr align="center">
+        <td>
+          <img src="images/noshearing.png" align="middle" width="700"/>
+          <figcaption align="center">Structural springs</figcaption>
+        </td>
+      </tr>
+      <tr align="center">
+        <td>
+          <img src="images/onlyshearing.png" align="middle" width="700"/>
+          <figcaption align="center">Shearing springs</figcaption>
+        </td>
+      </tr>
+      
+    </table>
+  </div>
+</p>
+<br><br>
+
+<h2 align="middle">Part II: Simulation via numerical integration</h2>
+<p>
+  In this section, I took the spring forces mentioned above, and used Verlet Integration to update the (x,y,z) position of each 
+  point mass in the cloth at each time step. The position update routine also adds 
+  the contraint that springs cannot extend more than 10% past their rest length. During the 
+  simulation, I also tweaked various cloth parameters and observed the outcomes:
+  <br><br>
+  a. Spring constant ks - Higher values for ks result in stiffer springs and a more rigid  
+  cloth overall. Lower values for ks result in more flexible springs and a more malleable 
+  cloth. 
+
+  <br><br>
+  <div align="middle">
+    <table style="width:100%">
+      <tr align="center">
+        <td>
+          <img src="images/highks.png" align="middle" width="350"/>
+          <figcaption align="center">Higher ks=50,000 N/m, stiffer springs</figcaption>
+        </td>
+        <td>
+          <img src="images/lowks.png" align="middle" width="350"/>
+          <figcaption align="center">Lower ks=5,000 N/m, more flexible springs</figcaption>
+        </td>
+      </tr>
+    </table>
+  </div>
+  <br><br>
+
+  b. Density - When the cloth's point masses have high density, they experience stronger 
+  forces from external sources of acceleration (F = ma), like gravity. Less dense cloths 
+  are less susceptible to external accelerations.
+
+  <br><br>
+  <div align="middle">
+    <table style="width:100%">
+      <tr align="center">
+        <td>
+          <img src="images/highdensity.png" align="middle" width="350"/>
+          <figcaption align="center">Higher density=15 g/cm^3, higher force from gravity</figcaption>
+        </td>
+        <td>
+          <img src="images/lowdensity.png" align="middle" width="350"/>
+          <figcaption align="center">Lower density=1.5 g/cm^3, lower force from gravity</figcaption>
+        </td>
+      </tr>
+    </table>
+  </div>
+  <br><br>
+
+  c. Damping - The damping value affects whether the point masses in a cloth simulation 
+  will come to rest, and if so, how fast that happens. Higher damping values simulate 
+  more loss of energy (through friction, heat, etc.), and result in cloths coming to rest 
+  faster. Low damping values cause more energy to persist in the cloth, which can be observed 
+  by oscillations in the point masses. 
+
+  <br><br>
+  <div align="middle">
+    <table style="width:100%">
+      <tr align="center">
+        <td>
+          <img src="images/highdamping.png" align="middle" width="350"/>
+          <figcaption align="center">Higher damping=20%, comes to rest more quickly</figcaption>
+        </td>
+        <td>
+          <img src="images/lowdamping.png" align="middle" width="350"/>
+          <figcaption align="center">Lower damping=2%, swings back and forth for longer, more ripples seen in point masses</figcaption>
+        </td>
+      </tr>
+    </table>
+  </div>
+  <br><br>
+
+  <div align="middle">
+    <img src="images/pinned4.png" align="middle" width="700"/>
+    <figcaption align="center">Shaded cloth pinned at 4 corners, in its final resting state</figcaption>
+  </div>
+</p>
+<br><br>
+<h2 align="middle">Part III: Handling collisions with other objects</h2>
+<p>
+  In this part, I added logic to handle collisions between the cloth and other objects 
+  in the scene, like spheres and planes. In order to do this, the simulation tries to 
+  "collide" each point mass in the cloth with every other object in the scene. For a 
+  sphere, a collision is found when the point mass's position is within the sphere, in which 
+  case a correction vector is computed, and the point mass's position is updated to 
+  lie just outside the sphere at the tangent point. For planes, my logic detects a collision 
+  when the point mass's position and last_position are on opposite sides of the plane, 
+  indicating that it crosses through during the current time step. Similar to spheres, 
+  my logic computes a correction vector to push the point mass's position back across the plane. 
+  <br><br>
+  <div align="middle">
+    <table style="width:100%">
+      <tr align="center">
+        <td>
+          <img src="images/spherecollision1.png" align="middle" width="350"/>
+          <figcaption align="center">Sphere collision initial</figcaption>
+        </td>
+        <td>
+          <img src="images/spherecollision2.png" align="middle" width="350"/>
+          <figcaption align="center">Sphere collision resting</figcaption>
+        </td>
+      </tr>
+      <tr align="center">
+        <td>
+          <img src="images/planecollision1.png" align="middle" width="350"/>
+          <figcaption align="center">Plane collision initial</figcaption>
+        </td>
+        <td>
+          <img src="images/planecollision2.png" align="middle" width="350"/>
+          <figcaption align="center">Plane collision resting</figcaption>
+        </td>
+      </tr>
+    </table>
+  </div>
+</p>
+<br><br>
+
+<h2 align="middle">Part IV: Handling self-collisions</h2>
+<p>
+  Up next, adding logic for self-collisions! The previous part did a good job of realistically 
+  colliding the cloth with other objects, but in certain simulations the cloth still displays 
+  weird behavior when falling onto itself or folding on itself. The naive solution for self-collisions 
+  loops through all pairs of point masses, and performs a modifying force between them if they're close 
+  enough together. For real time simulations, however, this O(n^2) approach is too slow. 
+
+  <br><br>
+  To speed up the algorithm, we take advantage of the fact that self-collisions only happen for 
+  point masses that are near each other in 3D space. My implementation subdivides the simulation's 
+  3D space into a volumetric grid, and then hashes each point mass into its corresponding bin. 
+  Now, a point mass only needs compute collision correction vectors for the neighbors found in 
+  its spatial map.
+
+  <br><br>
+  <div align="middle">
+    <table style="width:100%">
+      <tr align="center">
+        <td>
+          <img src="images/self1.png" align="middle" width="350"/>
+          <figcaption align="center">Self collision t0</figcaption>
+        </td>
+        <td>
+          <img src="images/self2.png" align="middle" width="350"/>
+          <figcaption align="center">Self collision t1</figcaption>
+        </td>
+      </tr>
+      <tr align="center">
+        <td>
+          <img src="images/self3.png" align="middle" width="350"/>
+          <figcaption align="center">Self collision t2</figcaption>
+        </td>
+        <td>
+          <img src="images/self4.png" align="middle" width="350"/>
+          <figcaption align="center">Self collision t3</figcaption>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <br><br>
+  <p>Below, observe how varying the cloth density as well as spring ks affects the 
+    behavior of the cloth as it falls on itself. For spring constant ks, higher values 
+    lead to stiffer springs and thus bigger curves when the cloth falls. For cloth density, 
+    higher density leads to the cloth folding on itself closer to the center, whereas a lower 
+    density cloth will fall in an off-centered fashion due to its lighter weight.
+  </p>
+  
+  <div align="middle">
+    <table style="width:100%">
+      <tr align="center">
+        <td>
+          <img src="images/self2.png" align="middle" width="350"/>
+          <figcaption align="center">Mid fall with low ks=5000 N/m</figcaption>
+        </td>
+        <td>
+          <img src="images/highksdrop.png" align="middle" width="350"/>
+          <figcaption align="center">Mid fall with high ks=500000 N/m</figcaption>
+        </td>
+      </tr>
+      <tr align="center">
+        <td>
+          <img src="images/self4.png" align="middle" width="350"/>
+          <figcaption align="center">Resting with high density=15 g/cm^3</figcaption>
+        </td>
+        <td>
+          <img src="images/lowdensitydrop.png" align="middle" width="350"/>
+          <figcaption align="center">Resting with low density=1.5 g/cm^3</figcaption>
+        </td>
+      </tr>
+    </table>
+  </div>
+</p>
+
+<h2 align="middle">Part V: Shaders</h2>
+<p>
+  Exhaustive raytracing is known to be a rather computationally expensive way to do lighting and shading. 
+  Shader programs in GLSL offer a cheaper alternative to rendering realistic lighting, textures, and materials. 
+  Shader programs consist of two parts, a vertex shader and a fragment shader. A vertex shader assigns vertex attributes 
+  and transforms the scene to normalized device coordinates. The fragment shader is responsible for 
+  assigning a vector (R,G,B,alpha) to every pixel in the display using interpolated vertex data. 
+  Fragment shaders can also manipulate vertex attributes data to yield different material effects.
+  <br><br>
+  The Blinn-Phong shading model combines 3 types of light distributions:
+  <br>1. Ambient light - light intensity that reflects uniformly off of all objects
+  <br>2. Diffuse light - surface normals that point closer to the light source have higher intensities, and 
+  surface normals that point away from the light source tend to be shadowed.
+  <br>3. Specular light - combines light sources, surface normals, and camera position to produce areas with 
+  a glare / reflection effect
+
+  <br><br>
+  <div align="middle">
+    <table style="width:100%">
+      <tr align="center">
+        <td>
+          <img src="images/ambient.png" align="middle" width="350"/>
+          <figcaption align="center">Ambient Lighting</figcaption>
+        </td>
+        <td>
+          <img src="images/diffuse.png" align="middle" width="350"/>
+          <figcaption align="center">Diffuse Lighting</figcaption>
+        </td>
+      </tr>
+      <tr align="center">
+        <td>
+          <img src="images/specular.png" align="middle" width="350"/>
+          <figcaption align="center">Specular Lighting</figcaption>
+        </td>
+        <td>
+          <img src="images/fullphong.png" align="middle" width="350"/>
+          <figcaption align="center">Full Blinn-Phong Lighting</figcaption>
+        </td>
+      </tr>
+    </table>
+  </div>
+  <br><br>
+  <h3>Texture Mapping!</h3>
+  <div align="middle">
+    <table style="width:100%">
+      <tr align="center">
+        <td>
+          <img src="images/texturet0.png" align="middle" width="350"/>
+          <figcaption align="center">Falling texture t0</figcaption>
+        </td>
+        <td>
+          <img src="images/texturet1.png" align="middle" width="350"/>
+          <figcaption align="center">Falling texture t1</figcaption>
+        </td>
+      </tr>
+    </table>
+  </div>
+  <br><br>
+  <h3>Bump Mapping!</h3>
+  <div align="middle">
+    <table style="width:100%">
+      <tr align="center">
+        <td>
+          <img src="images/bump0.png" align="middle" width="400"/>
+          <figcaption align="center">Bumpy t0</figcaption>
+        </td>
+        <td>
+          <img src="images/bump1.png" align="middle" width="400"/>
+          <figcaption align="center">Bumpy t1</figcaption>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <br><br>
+  <h3>Displacement Mapping!</h3>
+  <div align="middle">
+    <table style="width:100%">
+      <tr align="center">
+        <td>
+          <img src="images/disp0.png" align="middle" width="400"/>
+          <figcaption align="center">Displacement t0</figcaption>
+        </td>
+        <td>
+          <img src="images/disp1.png" align="middle" width="400"/>
+          <figcaption align="center">Displacement t1</figcaption>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <br><br>
+  <h3>Num samples vs coarseness</h3>
+  <p>As it can be seen below, bump mapping seems to do better for 16x16 sampling, 
+    as the 16x16 displacement map yields weirdly shaped edges. At 128x128 sampling, however,
+    displacement mapping does better at capturing the details of the textures, since the 
+    sampling rate is high enough for the surface displacements to match the high frequency 
+    content in the texture.
+  </p>
+  <div align="middle">
+    <table style="width:100%">
+      <tr align="center">
+        <td>
+          <img src="images/bump16.png" align="middle" width="400"/>
+          <figcaption align="center">Bump 16x16</figcaption>
+        </td>
+        <td>
+          <img src="images/bump128.png" align="middle" width="400"/>
+          <figcaption align="center">Bump 128x128</figcaption>
+        </td>
+      </tr>
+      <tr align="center">
+        <td>
+          <img src="images/disp16.png" align="middle" width="400"/>
+          <figcaption align="center">Displacement 16x16</figcaption>
+        </td>
+        <td>
+          <img src="images/disp128.png" align="middle" width="400"/>
+          <figcaption align="center">Displacement 128x128</figcaption>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <br><br>
+  <h3>Mirror Shading</h3>
+  <div align="middle">
+    <table style="width:100%">
+      <tr align="center">
+        <td>
+          <img src="images/mirror0.png" align="middle" width="400"/>
+          <figcaption align="center">Mirror t0</figcaption>
+        </td>
+        <td>
+          <img src="images/mirror1.png" align="middle" width="400"/>
+          <figcaption align="center">Mirror t1</figcaption>
+        </td>
+      </tr>
+    </table>
+  </div>
+</p>
+
+</body>
 </html>
